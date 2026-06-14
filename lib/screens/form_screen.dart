@@ -53,10 +53,12 @@ class _FormScreenState extends State<FormScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final company = Company(
+      id: _company?.id,
       name: _nameController.text.trim(),
       taxId: _taxIdController.text.trim(),
       address: _optionalText(_addressController.text),
       businessLine: _optionalText(_businessLineController.text),
+      isActive: _company?.isActive ?? true,
     );
 
     final companyProvider = context.read<CompanyProvider>();
@@ -96,144 +98,75 @@ class _FormScreenState extends State<FormScreen> {
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
           children: [
-            _IntroCard(isEditing: _isEditing, companyName: _company?.name),
-            const SizedBox(height: 18),
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: AppColors.line),
-                boxShadow: AppShadows.card,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _FieldLabel('Nombre'),
-                  _InputField(
-                    controller: _nameController,
-                    hint: 'Ej. Nova Comercial SAC',
-                    icon: Icons.apartment_rounded,
-                    textInputAction: TextInputAction.next,
-                    validator: (value) {
-                      if ((value ?? '').trim().isEmpty) {
-                        return 'El nombre es obligatorio.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  _FieldLabel('RUC'),
-                  _InputField(
-                    controller: _taxIdController,
-                    hint: 'Número de RUC',
-                    icon: Icons.badge_outlined,
-                    keyboardType: TextInputType.number,
-                    textInputAction: TextInputAction.next,
-                    validator: (value) {
-                      if ((value ?? '').trim().isEmpty) {
-                        return 'El RUC es obligatorio.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  _FieldLabel('Dirección'),
-                  _InputField(
-                    controller: _addressController,
-                    hint: 'Dirección fiscal o sede principal',
-                    icon: Icons.location_on_outlined,
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 16),
-                  _FieldLabel('Rubro'),
-                  _InputField(
-                    controller: _businessLineController,
-                    hint: 'Ej. Tecnología, retail, servicios',
-                    icon: Icons.storefront_rounded,
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) => _save(),
-                  ),
-                ],
-              ),
+            _FieldLabel('Nombre'),
+            _InputField(
+              controller: _nameController,
+              hint: 'Ej. Nova Comercial SAC',
+              icon: Icons.apartment_rounded,
+              textInputAction: TextInputAction.next,
+              validator: (value) {
+                if ((value ?? '').trim().isEmpty) {
+                  return 'El nombre es obligatorio.';
+                }
+                return null;
+              },
             ),
-            const SizedBox(height: 22),
-            FilledButton.icon(
-              onPressed: companyProvider.isLoading ? null : _save,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(54),
-                backgroundColor: AppColors.blue,
-              ),
-              icon: companyProvider.isLoading
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.check_rounded),
-              label: Text(_isEditing ? 'Guardar cambios' : 'Crear empresa'),
+            const SizedBox(height: 16),
+            _FieldLabel('RUC'),
+            _InputField(
+              controller: _taxIdController,
+              hint: 'Número de RUC',
+              icon: Icons.badge_outlined,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.next,
+              validator: (value) {
+                if ((value ?? '').trim().isEmpty) {
+                  return 'El RUC es obligatorio.';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            _FieldLabel('Dirección'),
+            _InputField(
+              controller: _addressController,
+              hint: 'Dirección fiscal o sede principal',
+              icon: Icons.location_on_outlined,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 16),
+            _FieldLabel('Rubro'),
+            _InputField(
+              controller: _businessLineController,
+              hint: 'Ej. Tecnología, retail, servicios',
+              icon: Icons.storefront_rounded,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => _save(),
             ),
           ],
         ),
       ),
-    );
-  }
-}
-
-class _IntroCard extends StatelessWidget {
-  final bool isEditing;
-  final String? companyName;
-
-  const _IntroCard({required this.isEditing, required this.companyName});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppColors.line),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceAlt,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Icon(
-              isEditing ? Icons.edit_rounded : Icons.add_business_rounded,
-              color: AppColors.blue,
-            ),
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: FilledButton(
+          onPressed: companyProvider.isLoading ? null : _save,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(54),
+            backgroundColor: AppColors.blue,
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isEditing ? 'Actualiza la ficha' : 'Ficha empresarial',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  isEditing
-                      ? 'Ajusta los datos de ${companyName ?? 'la empresa'}.'
-                      : 'Guarda los datos principales de la empresa.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ],
-            ),
-          ),
-        ],
+          child: companyProvider.isLoading
+              ? const SizedBox(
+                  height: 18,
+                  width: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : Text(_isEditing ? 'Guardar cambios' : 'Crear empresa'),
+        ),
       ),
     );
   }
@@ -253,7 +186,7 @@ class _FieldLabel extends StatelessWidget {
         style: const TextStyle(
           color: AppColors.ink,
           fontSize: 13,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w500,
         ),
       ),
     );

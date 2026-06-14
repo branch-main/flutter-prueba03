@@ -12,12 +12,10 @@ class AuthGate extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
 
-    if (authProvider.isLoading) {
+    if (!authProvider.hasLoadedSession) {
       return const Scaffold(
-        body: DecoratedBox(
-          decoration: BoxDecoration(gradient: AppGradients.brand),
-          child: Center(child: CircularProgressIndicator(color: Colors.white)),
-        ),
+        backgroundColor: Colors.white,
+        body: Center(child: CircularProgressIndicator(color: AppColors.blue)),
       );
     }
 

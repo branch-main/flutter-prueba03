@@ -6,11 +6,13 @@ import 'package:flutter/material.dart';
 class AuthProvider with ChangeNotifier {
   AuthUser? _user;
   bool _isLoading = true;
+  bool _hasLoadedSession = false;
   String? _errorMessage;
 
   AuthUser? get user => _user;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  bool get hasLoadedSession => _hasLoadedSession;
   bool get isAuthenticated => _user != null;
 
   Future<void> loadSession() async {
@@ -24,6 +26,7 @@ class AuthProvider with ChangeNotifier {
       _user = null;
       _errorMessage = error.toString();
     } finally {
+      _hasLoadedSession = true;
       _setLoading(false);
     }
   }

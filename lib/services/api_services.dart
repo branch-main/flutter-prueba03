@@ -124,6 +124,7 @@ class ApiService {
         'Tax ID is required' => 'El RUC es obligatorio.',
         'Full name is required' => 'El nombre completo es obligatorio.',
         'Company not found' => 'Empresa no encontrada.',
+        'Employee not found' => 'Empleado no encontrado.',
         'Route not found' => 'Ruta no encontrada.',
         'Internal server error' => 'Error del servidor.',
         _ => null,
@@ -251,5 +252,36 @@ class ApiService {
 
     _ensureSuccess(response, [200, 201], 'Error al crear empleado.');
     return Employee.fromJson(_decodeObject(response));
+  }
+
+  static Future<Employee> updateEmployee({
+    required int companyId,
+    required int employeeId,
+    required Employee employee,
+  }) async {
+    final response = await _send(
+      () async => http.put(
+        _uri('/companies/$companyId/employees/$employeeId'),
+        headers: await _headers(),
+        body: json.encode(employee.toJson()),
+      ),
+    );
+
+    _ensureSuccess(response, [200], 'Error al actualizar empleado.');
+    return Employee.fromJson(_decodeObject(response));
+  }
+
+  static Future<void> deleteEmployee({
+    required int companyId,
+    required int employeeId,
+  }) async {
+    final response = await _send(
+      () async => http.delete(
+        _uri('/companies/$companyId/employees/$employeeId'),
+        headers: await _headers(),
+      ),
+    );
+
+    _ensureSuccess(response, [200], 'Error al eliminar empleado.');
   }
 }

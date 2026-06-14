@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:crud_withnodejs/models/company.dart';
 import 'package:crud_withnodejs/services/api_services.dart';
 import 'package:flutter/material.dart';
@@ -6,11 +8,14 @@ class CompanyProvider with ChangeNotifier {
   List<Company> _companies = [];
   String _searchQuery = '';
   bool _isLoading = false;
+  bool _isSearchLoading = false;
   String? _errorMessage;
+  Timer? _searchTimer;
 
   List<Company> get companies => _companies;
   String get searchQuery => _searchQuery;
   bool get isLoading => _isLoading;
+  bool get isSearchLoading => _isSearchLoading;
   String? get errorMessage => _errorMessage;
 
   List<Company> get visibleCompanies {
@@ -25,14 +30,30 @@ class CompanyProvider with ChangeNotifier {
 
   void setSearchQuery(String value) {
     _searchQuery = value;
+    _searchTimer?.cancel();
+
+    if (value.trim().isEmpty) {
+      _isSearchLoading = false;
+      notifyListeners();
+      return;
+    }
+
+    _isSearchLoading = true;
     notifyListeners();
+
+    _searchTimer = Timer(const Duration(milliseconds: 450), () {
+      _isSearchLoading = false;
+      notifyListeners();
+    });
   }
 
   void clear() {
+    _searchTimer?.cancel();
     _companies = [];
     _searchQuery = '';
     _errorMessage = null;
     _isLoading = false;
+    _isSearchLoading = false;
     notifyListeners();
   }
 
@@ -118,5 +139,11 @@ class CompanyProvider with ChangeNotifier {
   void _setError(String? error) {
     _errorMessage = error;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _searchTimer?.cancel();
+    super.dispose();
   }
 }

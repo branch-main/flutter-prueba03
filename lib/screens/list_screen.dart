@@ -2,6 +2,7 @@ import 'package:crud_withnodejs/models/company.dart';
 import 'package:crud_withnodejs/providers/auth_provider.dart';
 import 'package:crud_withnodejs/providers/company_provider.dart';
 import 'package:crud_withnodejs/ui/app_theme.dart';
+import 'package:crud_withnodejs/ui/skeleton.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -133,6 +134,9 @@ class _ListScreenState extends State<ListScreen> {
     final companyProvider = context.watch<CompanyProvider>();
     final authProvider = context.watch<AuthProvider>();
     final companies = companyProvider.visibleCompanies;
+    final isShowingSkeleton =
+        companyProvider.isSearchLoading ||
+        (companyProvider.isLoading && companyProvider.companies.isEmpty);
     final userName = authProvider.user?.name?.trim().isNotEmpty == true
         ? authProvider.user!.name!.trim()
         : authProvider.user?.email ?? 'Usuario';
@@ -148,7 +152,12 @@ class _ListScreenState extends State<ListScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 108),
             children: [
               _HomeTopBar(userName: userName, onLogout: _logout),
-              const SizedBox(height: 18),
+              const SizedBox(height: 22),
+              Text(
+                'Empresas',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 12),
               _SearchBox(
                 controller: _searchController,
                 query: companyProvider.searchQuery,
@@ -159,63 +168,59 @@ class _ListScreenState extends State<ListScreen> {
                 },
               ),
               const SizedBox(height: 14),
-              _StatsRow(
-                total: companyProvider.companies.length,
-                visible: companies.length,
-                isSearching: companyProvider.searchQuery.isNotEmpty,
-              ),
-              const SizedBox(height: 20),
-              if (companyProvider.isLoading &&
-                  companyProvider.companies.isEmpty)
-                const _LoadingState()
-              else if (companies.isEmpty)
-                _EmptyState(isSearching: companyProvider.searchQuery.isNotEmpty)
-              else
-                ...companies.indexed.expand((entry) {
-                  final index = entry.$1;
-                  final company = entry.$2;
-
-                  return [
-                    Dismissible(
-                      key: ValueKey(company.id ?? company.taxId),
-                      direction: DismissDirection.horizontal,
-                      confirmDismiss: (_) => _deleteCompany(company),
-                      background: const _DeleteBackground(
-                        alignment: Alignment.centerLeft,
+              if (isShowingSkeleton) ...[
+                const _DirectorySummarySkeleton(),
+                const SizedBox(height: 18),
+                const _LoadingState(),
+              ] else ...[
+                _DirectorySummary(
+                  total: companyProvider.companies.length,
+                  visible: companies.length,
+                  isSearching: companyProvider.searchQuery.isNotEmpty,
+                ),
+                const SizedBox(height: 18),
+                if (companies.isEmpty)
+                  _EmptyState(
+                    isSearching: companyProvider.searchQuery.isNotEmpty,
+                  )
+                else
+                  ...companies.expand((company) {
+                    return [
+                      Dismissible(
+                        key: ValueKey(company.id ?? company.taxId),
+                        direction: DismissDirection.horizontal,
+                        confirmDismiss: (_) => _deleteCompany(company),
+                        background: const _DeleteBackground(
+                          alignment: Alignment.centerLeft,
+                        ),
+                        secondaryBackground: const _DeleteBackground(
+                          alignment: Alignment.centerRight,
+                        ),
+                        child: _CompanyCard(
+                          company: company,
+                          onTap: () => _openDetail(company),
+                          onEdit: () => _openForm(company),
+                          onDelete: () => _deleteCompany(company),
+                        ),
                       ),
-                      secondaryBackground: const _DeleteBackground(
-                        alignment: Alignment.centerRight,
-                      ),
-                      child: _CompanyCard(
-                        company: company,
-                        color: _cardColors[index % _cardColors.length],
-                        onTap: () => _openDetail(company),
-                        onEdit: () => _openForm(company),
-                        onDelete: () => _deleteCompany(company),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                  ];
-                }),
+                      const SizedBox(height: 14),
+                    ];
+                  }),
+              ],
             ],
           ),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openForm(),
+        backgroundColor: AppColors.blue,
+        foregroundColor: Colors.white,
         icon: const Icon(Icons.add_rounded),
         label: const Text('Nueva empresa'),
       ),
     );
   }
 }
-
-const _cardColors = [
-  AppColors.blue,
-  AppColors.cyan,
-  AppColors.mint,
-  AppColors.amber,
-];
 
 class _HomeTopBar extends StatelessWidget {
   final String userName;
@@ -227,23 +232,6 @@ class _HomeTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          width: 52,
-          height: 52,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            gradient: AppGradients.accent,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            _initials(userName),
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-        const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -305,12 +293,12 @@ class _SearchBox extends StatelessWidget {
   }
 }
 
-class _StatsRow extends StatelessWidget {
+class _DirectorySummary extends StatelessWidget {
   final int total;
   final int visible;
   final bool isSearching;
 
-  const _StatsRow({
+  const _DirectorySummary({
     required this.total,
     required this.visible,
     required this.isSearching,
@@ -318,68 +306,28 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _StatPill(
-            icon: Icons.apartment_rounded,
-            label: '$total empresas',
-            selected: !isSearching,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _StatPill(
-            icon: Icons.manage_search_rounded,
-            label: isSearching ? '$visible resultados' : 'Todo visible',
-            selected: isSearching,
-          ),
-        ),
-      ],
-    );
-  }
-}
+    final text = isSearching
+        ? '$visible ${_matchesLabel(visible)} encontradas'
+        : _registeredCompaniesLabel(total);
 
-class _StatPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool selected;
-
-  const _StatPill({
-    required this.icon,
-    required this.label,
-    required this.selected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: selected ? AppColors.ink : AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.line),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            icon,
+            isSearching ? Icons.manage_search_rounded : Icons.apartment_rounded,
             size: 18,
-            color: selected ? Colors.white : AppColors.muted,
+            color: AppColors.muted,
           ),
           const SizedBox(width: 8),
-          Flexible(
+          Expanded(
             child: Text(
-              label,
+              text,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: selected ? Colors.white : AppColors.ink,
-                fontWeight: FontWeight.w800,
-                fontSize: 13,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.muted),
             ),
           ),
         ],
@@ -390,14 +338,12 @@ class _StatPill extends StatelessWidget {
 
 class _CompanyCard extends StatelessWidget {
   final Company company;
-  final Color color;
   final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   const _CompanyCard({
     required this.company,
-    required this.color,
     required this.onTap,
     required this.onEdit,
     required this.onDelete,
@@ -405,127 +351,76 @@ class _CompanyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: AppColors.line),
-        boxShadow: AppShadows.card,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(26),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(26),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 58,
-                      height: 58,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        _initials(company.name),
-                        style: TextStyle(
-                          color: color,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
+    final businessLine = _valueOrFallback(company.businessLine, 'Sin rubro');
+    final address = company.address?.trim();
+
+    return Opacity(
+      opacity: company.isActive ? 1 : 0.5,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: company.isActive ? AppShadows.card : const [],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(24),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 8, 16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          company.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            company.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              _RucPill(taxId: company.taxId),
-                              const SizedBox(width: 8),
-                              const _StatusPill(),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    PopupMenuButton<String>(
-                      tooltip: 'Opciones',
-                      icon: const Icon(Icons.more_horiz_rounded),
-                      onSelected: (value) {
-                        if (value == 'edit') onEdit();
-                        if (value == 'delete') onDelete();
-                      },
-                      itemBuilder: (context) => const [
-                        PopupMenuItem(value: 'edit', child: Text('Editar')),
-                        PopupMenuItem(value: 'delete', child: Text('Eliminar')),
+                        const SizedBox(height: 5),
+                        Text(
+                          businessLine,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            _RucPill(taxId: company.taxId),
+                            if (address != null && address.isNotEmpty)
+                              _AddressInline(label: address),
+                          ],
+                        ),
                       ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _InfoChip(
-                      icon: Icons.storefront_rounded,
-                      label: company.businessLine ?? 'Sin rubro',
-                    ),
-                    _InfoChip(
-                      icon: Icons.location_on_outlined,
-                      label: company.address ?? 'Sin dirección',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextButton.icon(
-                  onPressed: onTap,
-                  icon: const Icon(Icons.arrow_outward_rounded),
-                  label: const Text('Ver detalle'),
-                ),
-              ],
+                  ),
+                  PopupMenuButton<String>(
+                    tooltip: 'Opciones',
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.more_horiz_rounded),
+                    onSelected: (value) {
+                      if (value == 'edit') onEdit();
+                      if (value == 'delete') onDelete();
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(value: 'edit', child: Text('Editar')),
+                      PopupMenuItem(value: 'delete', child: Text('Eliminar')),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusPill extends StatelessWidget {
-  const _StatusPill();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: AppColors.mint.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: const Text(
-        'Activo',
-        style: TextStyle(
-          color: AppColors.mint,
-          fontSize: 12,
-          fontWeight: FontWeight.w900,
         ),
       ),
     );
@@ -550,43 +445,40 @@ class _RucPill extends StatelessWidget {
         style: const TextStyle(
           color: AppColors.ink,
           fontSize: 12,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
   }
 }
 
-class _InfoChip extends StatelessWidget {
-  final IconData icon;
+class _AddressInline extends StatelessWidget {
   final String label;
 
-  const _InfoChip({required this.icon, required this.label});
+  const _AddressInline({required this.label});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceAlt,
-        borderRadius: BorderRadius.circular(16),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: AppColors.muted),
-          const SizedBox(width: 6),
+          const Icon(
+            Icons.location_on_outlined,
+            size: 14,
+            color: AppColors.muted,
+          ),
+          const SizedBox(width: 5),
           ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 190),
+            constraints: const BoxConstraints(maxWidth: 150),
             child: Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.muted,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontSize: 12, height: 1),
             ),
           ),
         ],
@@ -615,14 +507,86 @@ class _DeleteBackground extends StatelessWidget {
   }
 }
 
+class _DirectorySummarySkeleton extends StatelessWidget {
+  const _DirectorySummarySkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SkeletonShimmer(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+        child: Row(
+          children: [
+            SkeletonBlock(width: 18, height: 18, radius: 6),
+            SizedBox(width: 8),
+            SkeletonBlock(width: 150, height: 14, radius: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _LoadingState extends StatelessWidget {
   const _LoadingState();
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(
-      height: 250,
-      child: Center(child: CircularProgressIndicator(color: AppColors.blue)),
+    return const Column(
+      children: [
+        _CompanyCardSkeleton(),
+        SizedBox(height: 14),
+        _CompanyCardSkeleton(),
+        SizedBox(height: 14),
+        _CompanyCardSkeleton(),
+        SizedBox(height: 14),
+        _CompanyCardSkeleton(),
+        SizedBox(height: 14),
+        _CompanyCardSkeleton(),
+      ],
+    );
+  }
+}
+
+class _CompanyCardSkeleton extends StatelessWidget {
+  const _CompanyCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 16, 8, 16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: AppShadows.card,
+      ),
+      child: const SkeletonShimmer(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonBlock(width: 170, height: 18),
+                  SizedBox(height: 8),
+                  SkeletonBlock(width: 120, height: 14),
+                  SizedBox(height: 14),
+                  Row(
+                    children: [
+                      SkeletonBlock(width: 86, height: 30, radius: 14),
+                      SizedBox(width: 8),
+                      SkeletonBlock(width: 120, height: 30, radius: 14),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: 12),
+            SkeletonBlock(width: 38, height: 38, radius: 19),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -634,64 +598,61 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(26),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppColors.line),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 70,
-            height: 70,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceAlt,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Icon(
-              isSearching
-                  ? Icons.manage_search_rounded
-                  : Icons.business_outlined,
-              color: AppColors.blue,
-              size: 34,
-            ),
+    return SizedBox(
+      height: 320,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 70,
+                height: 70,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceAlt,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Icon(
+                  isSearching
+                      ? Icons.manage_search_rounded
+                      : Icons.business_outlined,
+                  color: AppColors.blue,
+                  size: 34,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                isSearching ? 'Sin resultados' : 'Aún no hay empresas',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isSearching
+                    ? 'Prueba con otro nombre o RUC para encontrar coincidencias.'
+                    : 'Crea tu primera empresa y empieza a organizar el directorio.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
           ),
-          const SizedBox(height: 18),
-          Text(
-            isSearching ? 'Sin resultados' : 'Aún no hay empresas',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            isSearching
-                ? 'Prueba con otro nombre o RUC para encontrar coincidencias.'
-                : 'Crea tu primera empresa y empieza a organizar el directorio.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-String _initials(String value) {
-  final parts = value
-      .trim()
-      .split(RegExp(r'\s+'))
-      .where((part) => part.isNotEmpty)
-      .toList();
+String _valueOrFallback(String? value, String fallback) {
+  final trimmedValue = value?.trim();
+  if (trimmedValue == null || trimmedValue.isEmpty) return fallback;
 
-  if (parts.isEmpty) return 'E';
+  return trimmedValue;
+}
 
-  final first = parts.first[0];
-  final second = parts.length > 1
-      ? parts[1][0]
-      : parts.first.length > 1
-      ? parts.first[1]
-      : '';
+String _matchesLabel(int count) =>
+    count == 1 ? 'coincidencia' : 'coincidencias';
 
-  return '$first$second'.toUpperCase();
+String _registeredCompaniesLabel(int count) {
+  return count == 1 ? '1 empresa registrada' : '$count empresas registradas';
 }
