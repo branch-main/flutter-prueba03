@@ -1,8 +1,11 @@
-import 'package:crud_withnodejs/models/company.dart';
-import 'package:crud_withnodejs/providers/company_provider.dart';
-import 'package:crud_withnodejs/ui/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import 'package:crud_withnodejs/controllers/company_form_controller.dart';
+import 'package:crud_withnodejs/core/app_theme.dart';
+import 'package:crud_withnodejs/providers/company_provider.dart';
+import 'package:crud_withnodejs/utils/dialog_utils.dart';
+import 'package:crud_withnodejs/widgets/company/company_form_fields.dart';
 
 class FormScreen extends StatefulWidget {
   const FormScreen({super.key});
@@ -12,79 +15,40 @@ class FormScreen extends StatefulWidget {
 }
 
 class _FormScreenState extends State<FormScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _taxIdController = TextEditingController();
-  final _addressController = TextEditingController();
-  final _businessLineController = TextEditingController();
-  Company? _company;
-  bool _loadedArguments = false;
-
-  bool get _isEditing => _company?.id != null;
+  final _controller = CompanyFormController();
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-
-    if (_loadedArguments) return;
-
-    final arguments = ModalRoute.of(context)?.settings.arguments;
-    if (arguments is Company) {
-      _company = arguments;
-      _nameController.text = arguments.name;
-      _taxIdController.text = arguments.taxId;
-      _addressController.text = arguments.address ?? '';
-      _businessLineController.text = arguments.businessLine ?? '';
-    }
-
-    _loadedArguments = true;
+    _controller.loadArguments(ModalRoute.of(context)?.settings.arguments);
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _taxIdController.dispose();
-    _addressController.dispose();
-    _businessLineController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_controller.validate()) return;
 
-    final company = Company(
-      id: _company?.id,
-      name: _nameController.text.trim(),
-      taxId: _taxIdController.text.trim(),
-      address: _optionalText(_addressController.text),
-      businessLine: _optionalText(_businessLineController.text),
-      isActive: _company?.isActive ?? true,
-    );
-
+    final company = _controller.toCompany();
     final companyProvider = context.read<CompanyProvider>();
-    final success = _isEditing
-        ? await companyProvider.update(_company!.id!, company)
+    final success = _controller.isEditing
+        ? await companyProvider.update(_controller.company!.id!, company)
         : await companyProvider.add(company);
 
     if (!mounted) return;
 
     if (!success) {
-      _showError(companyProvider.errorMessage ?? 'No se pudo guardar.');
+      showAppError(
+        context,
+        companyProvider.errorMessage ?? 'No se pudo guardar.',
+      );
       return;
     }
 
     Navigator.pop(context, true);
-  }
-
-  String? _optionalText(String value) {
-    final text = value.trim();
-    return text.isEmpty ? null : text;
-  }
-
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppColors.danger),
-    );
   }
 
   @override
@@ -93,57 +57,19 @@ class _FormScreenState extends State<FormScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? 'Editar empresa' : 'Nueva empresa'),
+        title: Text(_controller.isEditing ? 'Editar empresa' : 'Nueva empresa'),
       ),
       body: Form(
-        key: _formKey,
+        key: _controller.formKey,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
           children: [
-            _FieldLabel('Nombre'),
-            _InputField(
-              controller: _nameController,
-              hint: 'Ej. Nova Comercial SAC',
-              icon: Icons.apartment_rounded,
-              textInputAction: TextInputAction.next,
-              validator: (value) {
-                if ((value ?? '').trim().isEmpty) {
-                  return 'El nombre es obligatorio.';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            _FieldLabel('RUC'),
-            _InputField(
-              controller: _taxIdController,
-              hint: 'Número de RUC',
-              icon: Icons.badge_outlined,
-              keyboardType: TextInputType.number,
-              textInputAction: TextInputAction.next,
-              validator: (value) {
-                if ((value ?? '').trim().isEmpty) {
-                  return 'El RUC es obligatorio.';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            _FieldLabel('Dirección'),
-            _InputField(
-              controller: _addressController,
-              hint: 'Dirección fiscal o sede principal',
-              icon: Icons.location_on_outlined,
-              textInputAction: TextInputAction.next,
-            ),
-            const SizedBox(height: 16),
-            _FieldLabel('Rubro'),
-            _InputField(
-              controller: _businessLineController,
-              hint: 'Ej. Tecnología, retail, servicios',
-              icon: Icons.storefront_rounded,
-              textInputAction: TextInputAction.done,
-              onFieldSubmitted: (_) => _save(),
+            CompanyFormFields(
+              nameController: _controller.nameController,
+              taxIdController: _controller.taxIdController,
+              addressController: _controller.addressController,
+              businessLineController: _controller.businessLineController,
+              onSubmitted: _save,
             ),
           ],
         ),
@@ -165,62 +91,11 @@ class _FormScreenState extends State<FormScreen> {
                     color: Colors.white,
                   ),
                 )
-              : Text(_isEditing ? 'Guardar cambios' : 'Crear empresa'),
+              : Text(
+                  _controller.isEditing ? 'Guardar cambios' : 'Crear empresa',
+                ),
         ),
       ),
-    );
-  }
-}
-
-class _FieldLabel extends StatelessWidget {
-  final String text;
-
-  const _FieldLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 2, bottom: 8),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: AppColors.ink,
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-}
-
-class _InputField extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
-  final IconData icon;
-  final TextInputType? keyboardType;
-  final TextInputAction? textInputAction;
-  final String? Function(String?)? validator;
-  final ValueChanged<String>? onFieldSubmitted;
-
-  const _InputField({
-    required this.controller,
-    required this.hint,
-    required this.icon,
-    this.keyboardType,
-    this.textInputAction,
-    this.validator,
-    this.onFieldSubmitted,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      textInputAction: textInputAction,
-      onFieldSubmitted: onFieldSubmitted,
-      decoration: InputDecoration(hintText: hint, prefixIcon: Icon(icon)),
-      validator: validator,
     );
   }
 }

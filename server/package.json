@@ -6,8 +6,6 @@
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "start": "bun src/index.ts",
-    "db:up": "docker compose up -d",
-    "db:down": "docker compose down",
     "prisma:generate": "bunx --bun prisma generate",
     "prisma:migrate": "bunx --bun prisma migrate dev",
     "prisma:deploy": "bunx --bun prisma migrate deploy",

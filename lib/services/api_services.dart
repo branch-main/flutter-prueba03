@@ -1,10 +1,11 @@
 import 'dart:convert';
 
+import 'package:http/http.dart' as http;
+
 import 'package:crud_withnodejs/models/auth_session.dart';
 import 'package:crud_withnodejs/models/company.dart';
 import 'package:crud_withnodejs/models/employee.dart';
 import 'package:crud_withnodejs/services/auth_storage.dart';
-import 'package:http/http.dart' as http;
 
 class ApiException implements Exception {
   final String message;
@@ -134,17 +135,56 @@ class ApiService {
     }
   }
 
+  static Future<T> _requestObject<T>({
+    required Future<http.Response> Function() request,
+    required List<int> successStatusCodes,
+    required String fallbackMessage,
+    required T Function(Map<String, dynamic>) fromJson,
+  }) async {
+    final response = await _send(request);
+    _ensureSuccess(response, successStatusCodes, fallbackMessage);
+    return fromJson(_decodeObject(response));
+  }
+
+  static Future<List<T>> _requestList<T>({
+    required Future<http.Response> Function() request,
+    required List<int> successStatusCodes,
+    required String fallbackMessage,
+    required T Function(Map<String, dynamic>) fromJson,
+  }) async {
+    final response = await _send(request);
+    _ensureSuccess(response, successStatusCodes, fallbackMessage);
+
+    try {
+      final items = _decodeList(response);
+      return items
+          .map((item) => fromJson(Map<String, dynamic>.from(item)))
+          .toList();
+    } catch (_) {
+      throw ApiException('Respuesta inválida del servidor.');
+    }
+  }
+
+  static Future<void> _requestVoid({
+    required Future<http.Response> Function() request,
+    required List<int> successStatusCodes,
+    required String fallbackMessage,
+  }) async {
+    final response = await _send(request);
+    _ensureSuccess(response, successStatusCodes, fallbackMessage);
+  }
+
   static Future<AuthSession> login(String email, String password) async {
-    final response = await _send(
-      () async => http.post(
+    return _requestObject(
+      request: () async => http.post(
         _uri('/auth/login'),
         headers: await _headers(withAuth: false),
         body: json.encode({'email': email, 'password': password}),
       ),
+      successStatusCodes: const [200],
+      fallbackMessage: 'No se pudo iniciar sesión.',
+      fromJson: AuthSession.fromJson,
     );
-
-    _ensureSuccess(response, [200], 'No se pudo iniciar sesión.');
-    return AuthSession.fromJson(_decodeObject(response));
   }
 
   static Future<AuthSession> register({
@@ -152,106 +192,89 @@ class ApiService {
     required String password,
     String? name,
   }) async {
-    final response = await _send(
-      () async => http.post(
+    return _requestObject(
+      request: () async => http.post(
         _uri('/auth/register'),
         headers: await _headers(withAuth: false),
         body: json.encode({'email': email, 'password': password, 'name': name}),
       ),
+      successStatusCodes: const [201],
+      fallbackMessage: 'No se pudo crear la cuenta.',
+      fromJson: AuthSession.fromJson,
     );
-
-    _ensureSuccess(response, [201], 'No se pudo crear la cuenta.');
-    return AuthSession.fromJson(_decodeObject(response));
   }
 
   static Future<List<Company>> getCompanies({String? search}) async {
-    final response = await _send(
-      () async => http.get(
+    return _requestList(
+      request: () async => http.get(
         _uri('/companies', queryParameters: {'search': search}),
         headers: await _headers(),
       ),
+      successStatusCodes: const [200],
+      fallbackMessage: 'Error al listar empresas.',
+      fromJson: Company.fromJson,
     );
-
-    _ensureSuccess(response, [200], 'Error al listar empresas.');
-    return _decodeList(response)
-        .map((company) => Company.fromJson(Map<String, dynamic>.from(company)))
-        .toList();
   }
 
   static Future<Company> getCompany(int id) async {
-    final response = await _send(
-      () async => http.get(_uri('/companies/$id'), headers: await _headers()),
+    return _requestObject(
+      request: () async =>
+          http.get(_uri('/companies/$id'), headers: await _headers()),
+      successStatusCodes: const [200],
+      fallbackMessage: 'Error al obtener empresa.',
+      fromJson: Company.fromJson,
     );
-
-    _ensureSuccess(response, [200], 'Error al obtener empresa.');
-    return Company.fromJson(_decodeObject(response));
   }
 
   static Future<Company> createCompany(Company company) async {
-    final response = await _send(
-      () async => http.post(
+    return _requestObject(
+      request: () async => http.post(
         _uri('/companies'),
         headers: await _headers(),
         body: json.encode(company.toJson()),
       ),
+      successStatusCodes: const [200, 201],
+      fallbackMessage: 'Error al crear empresa.',
+      fromJson: Company.fromJson,
     );
-
-    _ensureSuccess(response, [200, 201], 'Error al crear empresa.');
-    return Company.fromJson(_decodeObject(response));
   }
 
   static Future<Company> updateCompany(int id, Company company) async {
-    final response = await _send(
-      () async => http.put(
+    return _requestObject(
+      request: () async => http.put(
         _uri('/companies/$id'),
         headers: await _headers(),
         body: json.encode(company.toJson()),
       ),
+      successStatusCodes: const [200],
+      fallbackMessage: 'Error al actualizar empresa.',
+      fromJson: Company.fromJson,
     );
-
-    _ensureSuccess(response, [200], 'Error al actualizar empresa.');
-    return Company.fromJson(_decodeObject(response));
   }
 
   static Future<void> deleteCompany(int id) async {
-    final response = await _send(
-      () async =>
+    await _requestVoid(
+      request: () async =>
           http.delete(_uri('/companies/$id'), headers: await _headers()),
+      successStatusCodes: const [200],
+      fallbackMessage: 'Error al eliminar empresa.',
     );
-
-    _ensureSuccess(response, [200], 'Error al eliminar empresa.');
-  }
-
-  static Future<List<Employee>> getEmployees(int companyId) async {
-    final response = await _send(
-      () async => http.get(
-        _uri('/companies/$companyId/employees'),
-        headers: await _headers(),
-      ),
-    );
-
-    _ensureSuccess(response, [200], 'Error al listar empleados.');
-    return _decodeList(response)
-        .map(
-          (employee) => Employee.fromJson(Map<String, dynamic>.from(employee)),
-        )
-        .toList();
   }
 
   static Future<Employee> createEmployee({
     required int companyId,
     required Employee employee,
   }) async {
-    final response = await _send(
-      () async => http.post(
+    return _requestObject(
+      request: () async => http.post(
         _uri('/companies/$companyId/employees'),
         headers: await _headers(),
         body: json.encode(employee.toJson()),
       ),
+      successStatusCodes: const [200, 201],
+      fallbackMessage: 'Error al crear empleado.',
+      fromJson: Employee.fromJson,
     );
-
-    _ensureSuccess(response, [200, 201], 'Error al crear empleado.');
-    return Employee.fromJson(_decodeObject(response));
   }
 
   static Future<Employee> updateEmployee({
@@ -259,29 +282,29 @@ class ApiService {
     required int employeeId,
     required Employee employee,
   }) async {
-    final response = await _send(
-      () async => http.put(
+    return _requestObject(
+      request: () async => http.put(
         _uri('/companies/$companyId/employees/$employeeId'),
         headers: await _headers(),
         body: json.encode(employee.toJson()),
       ),
+      successStatusCodes: const [200],
+      fallbackMessage: 'Error al actualizar empleado.',
+      fromJson: Employee.fromJson,
     );
-
-    _ensureSuccess(response, [200], 'Error al actualizar empleado.');
-    return Employee.fromJson(_decodeObject(response));
   }
 
   static Future<void> deleteEmployee({
     required int companyId,
     required int employeeId,
   }) async {
-    final response = await _send(
-      () async => http.delete(
+    await _requestVoid(
+      request: () async => http.delete(
         _uri('/companies/$companyId/employees/$employeeId'),
         headers: await _headers(),
       ),
+      successStatusCodes: const [200],
+      fallbackMessage: 'Error al eliminar empleado.',
     );
-
-    _ensureSuccess(response, [200], 'Error al eliminar empleado.');
   }
 }

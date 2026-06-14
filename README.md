@@ -1,17 +1,44 @@
-# crud_withnodejs
+# Registro de Empresas
 
-A new Flutter project.
+App Flutter para gestionar empresas y empleados. El backend está en [`server/`](server/README.md).
 
-## Getting Started
+## Requisitos
 
-This project is a starting point for a Flutter application.
+- Flutter SDK con Dart `^3.11.3`.
+- Bun 1.x.
+- PostgreSQL, local o con Docker.
 
-A few resources to get you started if this is your first Flutter project:
+## Ejecutar
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+API:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+cd server
+bun install
+cp .env.example .env
+docker compose up -d
+bun run prisma:deploy
+bun run prisma:generate
+bun run dev
+```
+
+App:
+
+```bash
+flutter pub get
+flutter run
+```
+
+La URL por defecto es `http://localhost:3000/api`.
+
+Para Android Emulator:
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000/api
+```
+
+Para celular físico, usa la IP de tu PC:
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://<IP_DE_TU_PC>:3000/api
+```

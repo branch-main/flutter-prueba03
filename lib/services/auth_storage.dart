@@ -1,5 +1,7 @@
-import 'package:crud_withnodejs/models/auth_session.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:crud_withnodejs/models/auth_session.dart';
+import 'package:crud_withnodejs/models/auth_user.dart';
 
 class AuthStorage {
   static const _tokenKey = 'auth_token';

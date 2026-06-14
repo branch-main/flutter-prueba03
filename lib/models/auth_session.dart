@@ -1,13 +1,4 @@
-class AuthUser {
-  final int id;
-  final String email;
-  final String? name;
-
-  AuthUser({required this.id, required this.email, this.name});
-
-  factory AuthUser.fromJson(Map<String, dynamic> json) =>
-      AuthUser(id: json['id'], email: json['email'], name: json['name']);
-}
+import 'package:crud_withnodejs/models/auth_user.dart';
 
 class AuthSession {
   final AuthUser user;
@@ -15,6 +6,10 @@ class AuthSession {
 
   AuthSession({required this.user, required this.token});
 
-  factory AuthSession.fromJson(Map<String, dynamic> json) =>
-      AuthSession(user: AuthUser.fromJson(json['user']), token: json['token']);
+  factory AuthSession.fromJson(Map<String, dynamic> json) {
+    return AuthSession(
+      user: AuthUser.fromJson(Map<String, dynamic>.from(json['user'])),
+      token: json['token'],
+    );
+  }
 }

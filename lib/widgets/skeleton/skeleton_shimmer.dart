@@ -1,5 +1,6 @@
-import 'package:crud_withnodejs/ui/app_theme.dart';
 import 'package:flutter/material.dart';
+
+import 'package:crud_withnodejs/core/app_theme.dart';
 
 class SkeletonShimmer extends StatefulWidget {
   final Widget child;
@@ -56,31 +57,6 @@ class _SkeletonShimmerState extends State<SkeletonShimmer>
           child: child,
         );
       },
-    );
-  }
-}
-
-class SkeletonBlock extends StatelessWidget {
-  final double? width;
-  final double height;
-  final double radius;
-
-  const SkeletonBlock({
-    super.key,
-    this.width,
-    required this.height,
-    this.radius = 12,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: AppColors.surfaceAlt,
-        borderRadius: BorderRadius.circular(radius),
-      ),
     );
   }
 }

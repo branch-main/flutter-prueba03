@@ -1,7 +1,9 @@
+import 'package:flutter/material.dart';
+
 import 'package:crud_withnodejs/models/auth_session.dart';
+import 'package:crud_withnodejs/models/auth_user.dart';
 import 'package:crud_withnodejs/services/api_services.dart';
 import 'package:crud_withnodejs/services/auth_storage.dart';
-import 'package:flutter/material.dart';
 
 class AuthProvider with ChangeNotifier {
   AuthUser? _user;
@@ -81,11 +83,6 @@ class AuthProvider with ChangeNotifier {
     } finally {
       _setLoading(false);
     }
-  }
-
-  void clearError() {
-    _errorMessage = null;
-    notifyListeners();
   }
 
   Future<void> _saveSession(AuthSession session) async {

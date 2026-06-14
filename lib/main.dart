@@ -1,11 +1,14 @@
-import 'package:crud_withnodejs/providers/auth_provider.dart';
-import 'package:crud_withnodejs/providers/company_provider.dart';
-import 'package:crud_withnodejs/screens/auth_gate.dart';
-import 'package:crud_withnodejs/screens/detail_screen.dart';
-import 'package:crud_withnodejs/screens/form_screen.dart';
-import 'package:crud_withnodejs/ui/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import 'package:crud_withnodejs/providers/auth_provider.dart';
+import 'package:crud_withnodejs/providers/company_provider.dart';
+import 'package:crud_withnodejs/core/auth_gate.dart';
+import 'package:crud_withnodejs/screens/detail_screen.dart';
+import 'package:crud_withnodejs/screens/form_screen.dart';
+import 'package:crud_withnodejs/screens/login_screen.dart';
+import 'package:crud_withnodejs/screens/register_screen.dart';
+import 'package:crud_withnodejs/core/app_theme.dart';
 
 void main() => runApp(const MyApp());
 
@@ -28,6 +31,8 @@ class MyApp extends StatelessWidget {
         initialRoute: '/',
         routes: {
           '/': (context) => const AuthGate(),
+          '/login': (context) => const LoginScreen(),
+          '/register': (context) => const RegisterScreen(),
           '/form': (context) => const FormScreen(),
           '/detail': (context) => const DetailScreen(),
         },

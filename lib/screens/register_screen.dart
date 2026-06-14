@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:crud_withnodejs/controllers/login_form_controller.dart';
+import 'package:crud_withnodejs/controllers/register_form_controller.dart';
 import 'package:crud_withnodejs/core/app_theme.dart';
 import 'package:crud_withnodejs/providers/auth_provider.dart';
 import 'package:crud_withnodejs/utils/dialog_utils.dart';
-import 'package:crud_withnodejs/widgets/auth/login_content.dart';
+import 'package:crud_withnodejs/widgets/auth/register_content.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  final _controller = LoginFormController();
+class _RegisterScreenState extends State<RegisterScreen> {
+  final _controller = RegisterFormController();
 
   @override
   void dispose() {
@@ -27,26 +27,27 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!_controller.validate()) return;
 
     final authProvider = context.read<AuthProvider>();
-    final success = await authProvider.login(
+    final success = await authProvider.register(
       email: _controller.email,
       password: _controller.password,
+      name: _controller.name,
     );
 
     if (!mounted) return;
 
-    if (success) {
-      Navigator.pushNamedAndRemoveUntil(context, '/', (_) => false);
+    if (!success) {
+      showAppError(
+        context,
+        authProvider.errorMessage ?? 'No se pudo crear la cuenta.',
+      );
       return;
     }
 
-    showAppError(
-      context,
-      authProvider.errorMessage ?? 'No se pudo iniciar sesión.',
-    );
+    Navigator.pushNamedAndRemoveUntil(context, '/', (_) => false);
   }
 
-  void _openRegister() {
-    Navigator.pushNamed(context, '/register');
+  void _openLogin() {
+    Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
   }
 
   InputDecoration _fieldDecoration({
@@ -82,16 +83,22 @@ class _LoginScreenState extends State<LoginScreen> {
               child: AnimatedBuilder(
                 animation: _controller,
                 builder: (context, child) {
-                  return LoginContent(
+                  return RegisterContent(
                     isLoading: authProvider.isLoading,
                     formKey: _controller.formKey,
+                    nameController: _controller.nameController,
                     emailController: _controller.emailController,
                     passwordController: _controller.passwordController,
+                    confirmPasswordController:
+                        _controller.confirmPasswordController,
                     obscurePassword: _controller.obscurePassword,
+                    obscureConfirmPassword: _controller.obscureConfirmPassword,
                     fieldDecoration: _fieldDecoration,
                     onSubmit: _submit,
-                    onOpenRegister: _openRegister,
+                    onOpenLogin: _openLogin,
                     onTogglePassword: _controller.togglePasswordVisibility,
+                    onToggleConfirmPassword:
+                        _controller.toggleConfirmPasswordVisibility,
                   );
                 },
               ),
