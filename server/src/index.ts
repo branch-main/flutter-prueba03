@@ -1,6 +1,6 @@
 import { Hono, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
-import { getAuthenticatedUser } from "./auth";
+import { getAuthenticatedUser, type AuthUser } from "./auth";
 import { prisma } from "./db";
 import { authRoutes } from "./routes/auth";
 import { companyRoutes } from "./routes/companies";
@@ -8,7 +8,11 @@ import { companyRoutes } from "./routes/companies";
 const port = Number(Bun.env.PORT ?? 3000);
 const host = Bun.env.HOST ?? "0.0.0.0";
 
-const app = new Hono();
+type AppVariables = {
+  user: AuthUser;
+};
+
+const app = new Hono<{ Variables: AppVariables }>();
 
 app.use(
   "*",
@@ -26,11 +30,14 @@ app.get("/health", async (context) => {
 
 app.route("/api/auth", authRoutes);
 
-const requireAuth: MiddlewareHandler = async (context, next) => {
-  if (!(await getAuthenticatedUser(context.req.raw))) {
-    return context.json({ error: "Unauthorized" }, 401);
-  }
+const requireAuth: MiddlewareHandler<{ Variables: AppVariables }> = async (
+  context,
+  next,
+) => {
+  const user = await getAuthenticatedUser(context.req.raw);
+  if (!user) return context.json({ error: "Unauthorized" }, 401);
 
+  context.set("user", user);
   await next();
 };
 

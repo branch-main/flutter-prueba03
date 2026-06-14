@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { AuthUser } from "../auth";
 import { prisma } from "../db";
 import {
   type DataResult,
@@ -23,6 +24,7 @@ type EmployeePayload = {
 
 type CompanyPayload = {
   id: number;
+  ownerId: number;
   name: string;
   taxId: string;
   address: string | null;
@@ -50,7 +52,7 @@ type EmployeeData = {
   isActive: boolean;
 };
 
-export const companyRoutes = new Hono();
+export const companyRoutes = new Hono<{ Variables: { user: AuthUser } }>();
 
 function toEmployee(employee: EmployeePayload) {
   return {
@@ -133,29 +135,39 @@ async function readEmployeeData(
   };
 }
 
-async function createCompany(data: CompanyData) {
-  const company = await prisma.company.create({ data });
+async function createCompany(ownerId: number, data: CompanyData) {
+  const company = await prisma.company.create({ data: { ...data, ownerId } });
   return toCompany(company);
 }
 
-async function updateCompany(id: number, data: CompanyData) {
-  const company = await prisma.company.findUnique({ where: { id } });
-  if (!company) return null;
-
-  const updatedCompany = await prisma.company.update({
-    where: { id },
+async function updateCompany(
+  ownerId: number,
+  companyId: number,
+  data: CompanyData,
+) {
+  const result = await prisma.company.updateMany({
+    where: { id: companyId, ownerId },
     data,
   });
 
-  return toCompany(updatedCompany);
-}
+  if (result.count === 0) return null;
 
-async function getCompanyEmployees(companyId: number) {
-  const company = await prisma.company.findUnique({
-    where: { id: companyId },
-    select: { id: true },
+  const company = await prisma.company.findFirst({
+    where: { id: companyId, ownerId },
   });
 
+  return company ? toCompany(company) : null;
+}
+
+async function getOwnedCompany(ownerId: number, companyId: number) {
+  return await prisma.company.findFirst({
+    where: { id: companyId, ownerId },
+    select: { id: true },
+  });
+}
+
+async function getCompanyEmployees(ownerId: number, companyId: number) {
+  const company = await getOwnedCompany(ownerId, companyId);
   if (!company) return null;
 
   const employees = await prisma.employee.findMany({
@@ -166,12 +178,12 @@ async function getCompanyEmployees(companyId: number) {
   return employees.map(toEmployee);
 }
 
-async function createEmployee(companyId: number, data: EmployeeData) {
-  const company = await prisma.company.findUnique({
-    where: { id: companyId },
-    select: { id: true },
-  });
-
+async function createEmployee(
+  ownerId: number,
+  companyId: number,
+  data: EmployeeData,
+) {
+  const company = await getOwnedCompany(ownerId, companyId);
   if (!company) return null;
 
   const employee = await prisma.employee.create({
@@ -184,17 +196,60 @@ async function createEmployee(companyId: number, data: EmployeeData) {
   return toEmployee(employee);
 }
 
+async function updateEmployee(
+  ownerId: number,
+  companyId: number,
+  employeeId: number,
+  data: EmployeeData,
+) {
+  const company = await getOwnedCompany(ownerId, companyId);
+  if (!company) return null;
+
+  const employee = await prisma.employee.findFirst({
+    where: { id: employeeId, companyId },
+    select: { id: true },
+  });
+
+  if (!employee) return null;
+
+  const updatedEmployee = await prisma.employee.update({
+    where: { id: employeeId },
+    data,
+  });
+
+  return toEmployee(updatedEmployee);
+}
+
+async function deleteEmployee(
+  ownerId: number,
+  companyId: number,
+  employeeId: number,
+) {
+  const company = await getOwnedCompany(ownerId, companyId);
+  if (!company) return false;
+
+  const result = await prisma.employee.deleteMany({
+    where: { id: employeeId, companyId },
+  });
+
+  return result.count > 0;
+}
+
 companyRoutes.get("/", async (context) => {
+  const user = context.get("user");
   const search = getOptionalText(context.req.query("search"));
   const companies = await prisma.company.findMany({
-    where: search
-      ? {
-          OR: [
-            { name: { contains: search, mode: "insensitive" } },
-            { taxId: { contains: search, mode: "insensitive" } },
-          ],
-        }
-      : undefined,
+    where: {
+      ownerId: user.id,
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { taxId: { contains: search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    },
     orderBy: { id: "desc" },
   });
 
@@ -202,41 +257,81 @@ companyRoutes.get("/", async (context) => {
 });
 
 companyRoutes.post("/", async (context) => {
+  const user = context.get("user");
   const result = await readCompanyData(context.req.raw);
   if (result.error) return context.json({ error: result.error }, 400);
 
-  return context.json(await createCompany(result.data), 201);
+  return context.json(await createCompany(user.id, result.data), 201);
 });
 
 companyRoutes.get("/:id/employees", async (context) => {
+  const user = context.get("user");
   const companyId = getId(context.req.param("id"));
   if (!companyId) return context.json({ error: "Company not found" }, 404);
 
-  const employees = await getCompanyEmployees(companyId);
+  const employees = await getCompanyEmployees(user.id, companyId);
   if (!employees) return context.json({ error: "Company not found" }, 404);
 
   return context.json(employees);
 });
 
 companyRoutes.post("/:id/employees", async (context) => {
+  const user = context.get("user");
   const companyId = getId(context.req.param("id"));
   if (!companyId) return context.json({ error: "Company not found" }, 404);
 
   const result = await readEmployeeData(context.req.raw);
   if (result.error) return context.json({ error: result.error }, 400);
 
-  const employee = await createEmployee(companyId, result.data);
+  const employee = await createEmployee(user.id, companyId, result.data);
   if (!employee) return context.json({ error: "Company not found" }, 404);
 
   return context.json(employee, 201);
 });
 
+companyRoutes.put("/:id/employees/:employeeId", async (context) => {
+  const user = context.get("user");
+  const companyId = getId(context.req.param("id"));
+  const employeeId = getId(context.req.param("employeeId"));
+  if (!companyId || !employeeId) {
+    return context.json({ error: "Employee not found" }, 404);
+  }
+
+  const result = await readEmployeeData(context.req.raw);
+  if (result.error) return context.json({ error: result.error }, 400);
+
+  const employee = await updateEmployee(
+    user.id,
+    companyId,
+    employeeId,
+    result.data,
+  );
+  if (!employee) return context.json({ error: "Employee not found" }, 404);
+
+  return context.json(employee);
+});
+
+companyRoutes.delete("/:id/employees/:employeeId", async (context) => {
+  const user = context.get("user");
+  const companyId = getId(context.req.param("id"));
+  const employeeId = getId(context.req.param("employeeId"));
+  if (!companyId || !employeeId) {
+    return context.json({ error: "Employee not found" }, 404);
+  }
+
+  const deleted = await deleteEmployee(user.id, companyId, employeeId);
+  if (!deleted) return context.json({ error: "Employee not found" }, 404);
+
+  return context.json({ ok: true });
+});
+
 companyRoutes.get("/:id", async (context) => {
+  const user = context.get("user");
   const companyId = getId(context.req.param("id"));
   if (!companyId) return context.json({ error: "Company not found" }, 404);
 
-  const company = await prisma.company.findUnique({
-    where: { id: companyId },
+  const company = await prisma.company.findFirst({
+    where: { id: companyId, ownerId: user.id },
     include: { employees: { orderBy: { id: "desc" } } },
   });
   if (!company) return context.json({ error: "Company not found" }, 404);
@@ -245,27 +340,30 @@ companyRoutes.get("/:id", async (context) => {
 });
 
 companyRoutes.put("/:id", async (context) => {
+  const user = context.get("user");
   const companyId = getId(context.req.param("id"));
   if (!companyId) return context.json({ error: "Company not found" }, 404);
 
   const result = await readCompanyData(context.req.raw);
   if (result.error) return context.json({ error: result.error }, 400);
 
-  const company = await updateCompany(companyId, result.data);
+  const company = await updateCompany(user.id, companyId, result.data);
   if (!company) return context.json({ error: "Company not found" }, 404);
 
   return context.json(company);
 });
 
 companyRoutes.delete("/:id", async (context) => {
+  const user = context.get("user");
   const companyId = getId(context.req.param("id"));
   if (!companyId) return context.json({ error: "Company not found" }, 404);
 
   const result = await prisma.company.deleteMany({
-    where: { id: companyId },
+    where: { id: companyId, ownerId: user.id },
   });
-  if (result.count === 0)
+  if (result.count === 0) {
     return context.json({ error: "Company not found" }, 404);
+  }
 
   return context.json({ ok: true });
 });
