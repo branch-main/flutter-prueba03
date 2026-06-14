@@ -188,11 +188,9 @@ class _ListScreenState extends State<ListScreen> {
                     return [
                       Dismissible(
                         key: ValueKey(company.id ?? company.taxId),
-                        direction: DismissDirection.horizontal,
+                        direction: DismissDirection.endToStart,
                         confirmDismiss: (_) => _deleteCompany(company),
-                        background: const _DeleteBackground(
-                          alignment: Alignment.centerLeft,
-                        ),
+                        background: const SizedBox.shrink(),
                         secondaryBackground: const _DeleteBackground(
                           alignment: Alignment.centerRight,
                         ),
@@ -606,20 +604,12 @@ class _EmptyState extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 70,
-                height: 70,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceAlt,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Icon(
-                  isSearching
-                      ? Icons.manage_search_rounded
-                      : Icons.business_outlined,
-                  color: AppColors.blue,
-                  size: 34,
-                ),
+              Icon(
+                isSearching
+                    ? Icons.manage_search_rounded
+                    : Icons.business_outlined,
+                color: AppColors.blue,
+                size: 42,
               ),
               const SizedBox(height: 18),
               Text(

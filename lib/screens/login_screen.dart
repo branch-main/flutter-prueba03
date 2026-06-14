@@ -163,8 +163,6 @@ class _AuthContent extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const _BrandMark(),
-          const SizedBox(height: 46),
           Text(
             isRegisterMode ? 'Crea tu cuenta' : 'Inicia sesión',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -374,31 +372,6 @@ class _AuthTextField extends StatelessWidget {
         ),
         validator: validator,
       ),
-    );
-  }
-}
-
-class _BrandMark extends StatelessWidget {
-  const _BrandMark();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: AppColors.blue,
-            borderRadius: BorderRadius.circular(11),
-          ),
-          child: const Icon(
-            Icons.business_center_rounded,
-            color: Colors.white,
-            size: 20,
-          ),
-        ),
-      ],
     );
   }
 }
